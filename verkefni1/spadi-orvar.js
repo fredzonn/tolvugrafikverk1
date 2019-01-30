@@ -9,18 +9,27 @@ var gl;
 
 var locPosition;
 var locColor;
+
 var bufferIdA;
 var bufferIdB;
 var bufferIdC;
+
 var colorA = vec4(1.0, 0.0, 0.0, 1.0);
 var colorB = colorA
 var colorC = vec4(0.0, 1.0, 0.0, 1.0);
-var xVel = 0.002;
-var yVel = 0.003;
-var down = true;
-var up = true;
-var left = true;
-var right = true;
+
+var xmove = 0.009;
+var xVel = 0.004;
+var yVel = 0.006;
+var speed = 0;
+
+var rightKey = true;
+var leftKey = true;
+
+var down = false;
+var up = false;
+var left = false;
+var right = false;
 
 window.onload = function init() {
     
@@ -29,17 +38,26 @@ window.onload = function init() {
     gl = WebGLUtils.setupWebGL( canvas );
     if ( !gl ) { alert( "WebGL isn't available" ); }
     
+    //Entity coords
     var verticesA = [vec2( -0.1, -0.9 ), vec2( -0.1, -0.86 ), vec2(  0.1, -0.86 ), vec2(  0.1, -0.9 ) ];
     var verticesB = [vec2( -0.1, 0.9 ), vec2( -0.1, 0.86 ), vec2(  0.1, 0.86 ), vec2(  0.1, 0.9 ) ];
     var verticesC = [vec2( 0.0, 0.0 ), vec2( 0.0, -0.04 ), vec2(  0.03, -0.04 ), vec2(  0.03, 0.0 ) ];
 
+    //Random variables
+    var randomX = (Math.random() * 2) - 1;
+    var randomUD = (Math.random() * 2);
+    var randomLR = (Math.random() * 2);
+
+    //Randomize the ball's starting position on the x-axis.
+    for(var j = 0; j < 4; j++){ 
+        verticesC[j][0] += randomX;
+    }   
+        
     //Configure WebGL
     gl.viewport( 0, 0, canvas.width, canvas.height );
     gl.clearColor( 0.8, 0.8, 0.8, 1.0 );
 
-    //
-    //  Load shaders and initialize attribute buffers
-    //
+    //Load shaders and initialize attribute buffers
     var program = initShaders( gl, "vertex-shader", "fragment-shader" );
     gl.useProgram( program );
 
@@ -69,55 +87,155 @@ window.onload = function init() {
     
     render();
 
+    randomDir();
+
+    // Event listener for keyboard
+    window.addEventListener("keyup", function(){
+        rightKey = false;
+        leftKey = false;
+    } );
+
     // Event listener for keyboard
     window.addEventListener("keydown", function(e){
         switch( e.keyCode ) {
-            case 37:	// vinstri ör
-                xmove = -0.04;
+            case 37:	// left arrow
+                leftKey = true;
+                rightKey = false;
                 break;
-            case 39:	// hægri ör
-                xmove = 0.04;
-                break;
-            default:
-                xmove = 0.0;
+            case 39:	// right arrow
+                rightKey = true;
+                leftKey = false;    
         }
-        for(i=0; i<4; i++) {
+    } );
+
+    function speed(){
+        xVel *= 2;
+        yVel *= 2;
+        xmove *= 2;
+    }
+
+    //Randomize the ball's direction.
+    function randomDir(){ 
+        if(randomUD <= 1){
+            down = true;
+        }
+        if(randomUD <= 2){
+            up = true;
+        }
+        if(randomLR <= 1){
+            right = true;
+        }
+        if(randomLR <= 2){
+            left = true;
+        }    
+    }     
+
+    //Collision detection for the ball
+    function ballCollision(){
+        //If it's on it's way down and it touches the outer edge of the paddle, down = false && up = true
+        if(down === true && 
+           verticesC[0][0] > verticesA[0][0] && verticesC[2][0] < verticesA[2][0] && 
+           verticesC[1][1] < verticesA[1][1] && verticesC[1][1] > verticesA[0][1]){
+                up = true;
+        }
+        //If it's on it's way up and it touches the outer edge of the paddle, down = true && up = false
+        if(up === true &&
+           verticesC[0][0] > verticesB[0][0] && verticesC[2][0] < verticesB[2][0] && 
+           verticesC[0][1] > verticesB[1][1] && verticesC[0][1] < verticesB[0][1]){ 
+                down = true;
+        }
+        //If it's on it's way right and touches the canvas border, right = false && left = true;
+        if(right === true &&
+           verticesC[2][0] > 1){
+                left = true;
+        }
+        //If it's on it's way left and touches the canvas border, right = true && left = false;
+        if(left === true &&
+           verticesC[0][0] < -1){
+                right = true;
+        }
+    }
+
+    function paddleCollision(){
+        //Collision detection for right side.
+        if(verticesA[3][0] >= 1){
+            verticesA[0][0] = 0.8;
+            verticesA[1][0] = 0.8;
+            verticesA[2][0] = 1;
+            verticesA[3][0] = 1;
+    
+            verticesB[0][0] = -1;
+            verticesB[1][0] = -1;
+            verticesB[2][0] = -0.8;
+            verticesB[3][0] = -0.8;
+        }
+
+        //Collision detection for left side 
+        if(verticesA[0][0] <= -1){
+            verticesA[0][0] = -1;
+            verticesA[1][0] = -1;
+            verticesA[2][0] = -0.8;
+            verticesA[3][0] = -0.8;
+    
+            verticesB[0][0] = 0.8;
+            verticesB[1][0] = 0.8;
+            verticesB[2][0] = 1;
+            verticesB[3][0] = 1;
+        }
+    }
+
+
+    function update(){
+
+    //Here we do the tasks that the simulation executes every 16hz or so.
+    paddleCollision();    
+
+    for(i=0; i<4; i++) {
+        if(leftKey){ 
+        //Paddle movement
+        verticesA[i][0] -= xmove;
+        verticesB[i][0] += xmove;
+        }
+        if(rightKey){ 
+            //Paddle movement
             verticesA[i][0] += xmove;
             verticesB[i][0] -= xmove;
         }
+    }
 
-        buffer();
-    } );
-
-    function collision(){
-        if(down === true && 
-           verticesC[0][0] >= verticesA[0][0] && verticesC[2][0] <= verticesA[2][0] && 
-           verticesC[1][1] <= verticesA[1][1] && verticesC[1][1] >= verticesA[0][1]){
-               up = true;
-           }
-        }
-
-    function update(){ 
-        for(i=0; i<4; i++) {
             if(down){
                 up = false;
-                verticesC[i][1] -= yVel;
-                collision();
+                verticesC[0][1] -= yVel;
+                verticesC[1][1] -= yVel;
+                verticesC[2][1] -= yVel;
+                verticesC[3][1] -= yVel;
+                ballCollision();
                 }
             if(up){
-                verticesC[i][1] += yVel;
+                verticesC[0][1] += yVel;
+                verticesC[1][1] += yVel;
+                verticesC[2][1] += yVel;
+                verticesC[3][1] += yVel;
                 down = false;
+                ballCollision();
             }
             if(right){
-                verticesC[i][0] += xVel;
+                verticesC[0][0] += xVel;
+                verticesC[1][0] += xVel;
+                verticesC[2][0] += xVel;
+                verticesC[3][0] += xVel;
                 left = false;
+                ballCollision();
             }
             if(left){
-                verticesC[i][0] -= xVel;
+                verticesC[0][0] -= xVel;
+                verticesC[1][0] -= xVel;
+                verticesC[2][0] -= xVel;
+                verticesC[3][0] -= xVel;
                 right = false;
+                ballCollision();
             }
-        
-        }
+    
         buffer();
     }
 
@@ -125,7 +243,11 @@ window.onload = function init() {
         update();
       }
     
+    //Requesting a recurring periodic "timer event" to make the game run.
     window.setInterval(mainIter, 16.666);
+
+    //Have the ball and paddle speed double every 20 seconds.
+    window.setInterval(speed, 20000);
 
     render();
 }
