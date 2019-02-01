@@ -13,15 +13,18 @@ var locColor;
 var bufferIdA;
 var bufferIdB;
 var bufferIdC;
+var bufferIdD;
 
 var colorA = vec4(1.0, 0.0, 0.0, 1.0);
 var colorB = colorA
 var colorC = vec4(0.0, 1.0, 0.0, 1.0);
+var colorD = vec4(0.0, 1.0, 0.0, 1.0);
 
 var xmove = 0.009;
 var xVel = 0.004;
 var yVel = 0.006;
 var speed = 0;
+var score = 0;
 
 var rightKey = true;
 var leftKey = true;
@@ -30,6 +33,8 @@ var down = false;
 var up = false;
 var left = false;
 var right = false;
+var flag = false;
+var timer = true;
 
 window.onload = function init() {
     
@@ -42,17 +47,11 @@ window.onload = function init() {
     var verticesA = [vec2( -0.1, -0.9 ), vec2( -0.1, -0.86 ), vec2(  0.1, -0.86 ), vec2(  0.1, -0.9 ) ];
     var verticesB = [vec2( -0.1, 0.9 ), vec2( -0.1, 0.86 ), vec2(  0.1, 0.86 ), vec2(  0.1, 0.9 ) ];
     var verticesC = [vec2( 0.0, 0.0 ), vec2( 0.0, -0.04 ), vec2(  0.03, -0.04 ), vec2(  0.03, 0.0 ) ];
+    var verticesD = [vec2( 0.0, 0.0 ), vec2( 0.0, -0.16 ), vec2(  0.12, -0.16 ), vec2(  0.12, 0.0 ) ];
 
-    //Random variables
-    var randomX = (Math.random() * 2) - 1;
-    var randomUD = (Math.random() * 2);
-    var randomLR = (Math.random() * 2);
-
-    //Randomize the ball's starting position on the x-axis.
-    for(var j = 0; j < 4; j++){ 
-        verticesC[j][0] += randomX;
-    }   
-        
+    randomBall();
+    randomPebble();
+   
     //Configure WebGL
     gl.viewport( 0, 0, canvas.width, canvas.height );
     gl.clearColor( 0.8, 0.8, 0.8, 1.0 );
@@ -75,6 +74,10 @@ window.onload = function init() {
         bufferIdC = gl.createBuffer();
         gl.bindBuffer( gl.ARRAY_BUFFER, bufferIdC );
         gl.bufferData( gl.ARRAY_BUFFER, flatten(verticesC), gl.DYNAMIC_DRAW );
+
+        bufferIdD = gl.createBuffer();
+        gl.bindBuffer( gl.ARRAY_BUFFER, bufferIdD );
+        gl.bufferData( gl.ARRAY_BUFFER, flatten(verticesD), gl.DYNAMIC_DRAW );
     }
     
     buffer();
@@ -90,9 +93,15 @@ window.onload = function init() {
     randomDir();
 
     // Event listener for keyboard
-    window.addEventListener("keyup", function(){
-        rightKey = false;
-        leftKey = false;
+    window.addEventListener("keyup", function(e){
+        switch( e.keyCode ) {
+            case 37:	// left arrow
+                leftKey = false;
+                break;
+            case 39:	// right arrow
+                rightKey = false;
+                break;    
+        }
     } );
 
     // Event listener for keyboard
@@ -104,7 +113,8 @@ window.onload = function init() {
                 break;
             case 39:	// right arrow
                 rightKey = true;
-                leftKey = false;    
+                leftKey = false;
+                break;    
         }
     } );
 
@@ -114,8 +124,43 @@ window.onload = function init() {
         xmove *= 2;
     }
 
+    //Randomize the ball's starting position on the x-axis.
+    function randomBall(){ 
+        var randomX = (Math.random() * 2) - 1;
+        
+        verticesC = [vec2( 0.0, 0.0 ), vec2( 0.0, -0.04 ), vec2(  0.03, -0.04 ), vec2(  0.03, 0.0 ) ];
+
+        for(var j = 0; j < 4; j++){ 
+            verticesC[j][0] += randomX;
+        }
+        randomDir();
+    }
+
+    //Randomize the pebble starting pos in the upper frame of canvas.
+    function randomPebble(){
+        var pebbleX = (Math.random() * 1) - 0.9;
+        var pebbleY = (Math.random()* 0.5);
+
+        verticesD = [vec2( 0.0, 0.0 ), vec2( 0.0, -0.16 ), vec2(  0.12, -0.16 ), vec2(  0.12, 0.0 ) ];
+
+        for(var i = 0; i < 4; i++){
+            verticesD[i][0] += pebbleX;
+        }
+        for(var j = 0; j < 2; j++){
+            verticesD[0][j] += pebbleY;
+            verticesD[1][j] += pebbleY;
+            verticesD[2][j] += pebbleY;
+            verticesD[3][j] += pebbleY;
+        }
+        
+    }
+
+
     //Randomize the ball's direction.
     function randomDir(){ 
+        var randomUD = (Math.random() * 2);
+        var randomLR = (Math.random() * 2);
+
         if(randomUD <= 1){
             down = true;
         }
@@ -132,6 +177,7 @@ window.onload = function init() {
 
     //Collision detection for the ball
     function ballCollision(){
+        flag = false;
         //If it's on it's way down and it touches the outer edge of the paddle, down = false && up = true
         if(down === true && 
            verticesC[0][0] > verticesA[0][0] && verticesC[2][0] < verticesA[2][0] && 
@@ -154,6 +200,26 @@ window.onload = function init() {
            verticesC[0][0] < -1){
                 right = true;
         }
+
+        if(down === true && 
+           verticesC[2][1] < -1 &&
+           flag === false){
+            timer = false;
+            flag = true;
+            randomPebble();
+            randomBall();
+               score = 0;
+               timer = true;
+           }
+           
+        if(up === true &&
+           verticesC[0][1] > 1 &&
+           flag === false){
+               flag = true;
+               randomPebble();
+               randomBall();
+               score = 0;
+           }
     }
 
     function paddleCollision(){
@@ -184,9 +250,7 @@ window.onload = function init() {
         }
     }
 
-
     function update(){
-
     //Here we do the tasks that the simulation executes every 16hz or so.
     paddleCollision();    
 
@@ -247,7 +311,9 @@ window.onload = function init() {
     window.setInterval(mainIter, 16.666);
 
     //Have the ball and paddle speed double every 20 seconds.
-    window.setInterval(speed, 20000);
+    if(timer === true){ 
+        window.setInterval(speed, 20000);
+    }
 
     render();
 }
@@ -272,6 +338,12 @@ window.onload = function init() {
         gl.bindBuffer( gl.ARRAY_BUFFER, bufferIdC );
         gl.vertexAttribPointer( locPosition, 2, gl.FLOAT, false, 0, 0 );
         gl.uniform4fv( locColor, flatten(colorC) );
+        gl.drawArrays( gl.TRIANGLE_FAN, 0, 4 );
+
+        // Draw verticesD
+        gl.bindBuffer( gl.ARRAY_BUFFER, bufferIdD );
+        gl.vertexAttribPointer( locPosition, 2, gl.FLOAT, false, 0, 0 );
+        gl.uniform4fv( locColor, flatten(colorD) );
         gl.drawArrays( gl.TRIANGLE_FAN, 0, 4 );
 
         window.requestAnimFrame(render);
